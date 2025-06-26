@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kayıp Hazine'nin Sırrı</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .font-serif {
+            font-family: 'Playfair Display', serif;
+        }
+        .chat-bubble-user {
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+            align-self: flex-end;
+        }
+        .chat-bubble-npc {
+            background-color: #4b5563; /* gray-600 */
+            color: white;
+            align-self: flex-start;
+        }
+        .chat-bubble {
+            max-width: 80%;
+            padding: 0.75rem;
+            border-radius: 1rem;
+            word-wrap: break-word;
+        }
+        .loader {
+            border: 4px solid #f3f3f3; /* light grey */
+            border-top: 4px solid #3498db; /* blue */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="container mx-auto p-4 max-w-7xl">
+        <h1 id="location-title" class="text-4xl font-serif text-center mb-6 text-amber-300"></h1>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+            <!-- Sol Panel: Dünya ve Hikaye -->
+            <div class="lg:col-span-3 bg-gray-800/50 p-6 rounded-2xl shadow-lg flex flex-col">
+                <div id="image-container" class="mb-6 rounded-lg overflow-hidden h-80 bg-gray-700 flex items-center justify-center">
+                    <!-- Üretilen görsel burada görünecek -->
+                    <div id="image-loader" class="loader hidden"></div>
+                    <img id="game-image" src="" alt="Oyun sahnesi" class="w-full h-full object-cover hidden">
+                </div>
+                <div id="story-text" class="text-lg leading-relaxed flex-grow">
+                    <!-- Hikaye metni burada görünecek -->
+                </div>
+                <div id="actions-container" class="mt-6">
+                    <!-- Eylem düğmeleri burada görünecek -->
+                </div>
+            </div>
+
+            <!-- Sağ Panel: Etkileşim -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Envanter -->
+                <div class="bg-gray-800/50 p-4 rounded-2xl shadow-lg">
+                    <h2 class="text-xl font-bold mb-3 text-amber-300">Envanter</h2>
+                    <ul id="inventory-list" class="list-disc list-inside">
+                        <!-- Envanter eşyaları buraya eklenecek -->
+                    </ul>
+                </div>
+                
+                <!-- Karakterler / Sohbet -->
+                <div id="npc-panel" class="bg-gray-800/50 p-4 rounded-2xl shadow-lg hidden">
+                     <h2 id="npc-panel-title" class="text-xl font-bold mb-3 text-amber-300">Konuşulacak Kişiler</h2>
+                     <div id="npc-buttons" class="space-y-2">
+                        <!-- NPC düğmeleri buraya eklenecek -->
+                     </div>
+                </div>
+
+                <!-- Sohbet Penceresi -->
+                <div id="chat-window" class="bg-gray-800/50 rounded-2xl shadow-lg hidden flex-col h-96">
+                    <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                        <h2 id="chat-with-name" class="text-xl font-bold text-amber-300"></h2>
+                        <button id="close-chat-btn" class="text-gray-400 hover:text-white">Kapat</button>
+                    </div>
+                    <div id="chat-history" class="flex-grow p-4 overflow-y-auto flex flex-col space-y-4">
+                        <!-- Sohbet geçmişi burada görünecek -->
+                    </div>
+                    <div class="p-4 border-t border-gray-700">
+                        <form id="chat-form" class="flex gap-2">
+                            <input type="text" id="chat-input" class="flex-grow bg-gray-700 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" placeholder="Mesajını yaz...">
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full">Gönder</button>
+                        </form>
+                        <div id="npc-thinking" class="text-center mt-2 text-sm text-gray-400 hidden">
+                            <p><i>...düşünüyor...</i></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Gemini ve Imagen API'leri için temel yapılandırma
+        const API_KEY = ""; // Canvas ortamı bu anahtarı otomatik olarak sağlayacaktır.
+        const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+        const IMAGEN_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${API_KEY}`;
+
+        // Oyunun durumu ve verileri
+        const gameState = {
+            currentLocation: null,
+            inventory: [],
+            currentChatNpc: null,
+            chatHistories: {}
+        };
+
+        const npcs = {
+            'elif': {
+                name: "Tarihçi Elif",
+                prompt: "Sen Tarihçi Elif'sin. Alaz Limanı'ndaki yerel müzede çalışıyorsun. Bilgili, zeki ama biraz endişeli ve temkinli birisin. Kullanıcının büyük amcası olan ünlü kaşif Prof. Aras'ı tanıyordun. Onun araştırmalarına ve aile geçmişine dair yüzeysel bilgilere sahipsin ama derin sırları hemen paylaşmazsın. Güven kazanman gerekiyor. Kısa ve net cevaplar ver. Kullanıcıya 'siz' diye hitap et.",
+                imagePrompt: "A portrait of a smart, cautious female historian named Elif, with glasses, in her late 30s, working in a library filled with old books and artifacts. She looks slightly worried. Photorealistic style."
+            },
+            'kenan': {
+                name: "Antikacı Kenan",
+                prompt: "Sen Antikacı Kenan'sın. Alaz Limanı'nın en eski antika dükkanının sahibisin. Yaşlı, kurnaz ve pazarlıkçı bir adamsın. Her şeyi duyar, her şeyi bilirsin ama bilgiyi asla bedavaya vermezsin. Her zaman bir karşılık beklersin. Konuşmalarında biraz iğneleyici ve gizemli ol. Prof. Aras'ı tanıyordun ve onun bazı eşyaları dükkanından geçti. Kullanıcıya 'evlat' diye hitap et.",
+                imagePrompt: "A portrait of a sly, old antique shop owner named Kenan. He is in his dimly lit shop, surrounded by mysterious old objects. He has a cunning glint in his eyes. Photorealistic style."
+            }
+        };
+
+        const locations = {
+            'ev': {
+                title: "Büyük Amcanın Çalışma Odası",
+                description: "Büyük amcandan gelen gizemli paketi az önce açtın. Masanın üzerinde, solgun ışığın aydınlattığı sararmış bir mektup ve yanında paslı, oymalı bir anahtar duruyor. Mektubu okudun, amcan senden 'Alaz Limanı'na gitmeni ve aile yadigarı bir sırrın peşine düşmeni istiyor. Ayrıca 'dikkatli ol, peşimdeler' diye de bir not düşmüş. Ne yapacaksın?",
+                imagePrompt: "A mysterious, dusty study room lit by a single desk lamp. On the old wooden desk, there is a yellowed, handwritten letter and an ornate, rusty old key. The atmosphere is filled with secrets. Photorealistic, dramatic lighting.",
+                actions: [{ text: "Mektubu ve anahtarı alıp Alaz Limanı'na git", target: 'liman' }],
+                npcs: []
+            },
+            'liman': {
+                title: "Alaz Limanı",
+                description: "Saatler süren bir yolculuktan sonra Alaz Limanı'na vardın. Martı sesleri ve iyot kokusu seni karşılıyor. Tarihi taş binalar, dar sokaklar ve hareketli bir liman... Amcanın mektubunda bahsettiği yer burası olmalı. Etrafta bir müze ve bir antika dükkanı tabelası gözüne çarpıyor. Nereye gitmek istersin?",
+                imagePrompt: "A scenic view of a mysterious, historical coastal town named 'Alaz Limanı'. Cobblestone streets, old stone buildings, a local museum, an antique shop, and a bustling harbor with fishing boats. The sky is slightly overcast. Photorealistic style.",
+                actions: [
+                    { text: "Müzeye git", target: 'muze' },
+                    { text: "Antika dükkanına git", target: 'antikaci' }
+                ],
+                npcs: ['kenan'] // Kenan limanda görülebilir
+            },
+            'muze': {
+                title: "Alaz Limanı Müzesi",
+                description: "Müzenin sessiz ve serin koridorlarındasın. Vitrinlerde kasabanın tarihi eserleri sergileniyor. Danışmada genç bir kadın çalışıyor. Belki de amcan hakkında bir şeyler biliyordur.",
+                imagePrompt: "The quiet and cool interior of a small town museum. Display cases show historical artifacts. A young, intelligent-looking female historian is working at the information desk. Soft, natural lighting from the windows.",
+                actions: [{ text: "Limana geri dön", target: 'liman' }],
+                npcs: ['elif']
+            },
+            'antikaci': {
+                title: "Kenan'ın Antika Dükkanı",
+                description: "Kapıdaki küçük zilin sesiyle loş ve tıklım tıklım dolu bir dükkana girdin. Havada eski kağıt ve ahşap kokusu var. Tezgahın arkasında yaşlı bir adam seni süzüyor. Burası Antikacı Kenan'ın yeri olmalı.",
+                imagePrompt: "The interior of a cluttered, dimly lit antique shop. Sunlight streams through a dusty window, illuminating countless old objects, books, and furniture. An old, sly-looking man stands behind the counter, observing.",
+                actions: [{ text: "Limana geri dön", target: 'liman' }],
+                npcs: ['kenan']
+            }
+        };
+
+        // UI Elementleri
+        const locationTitle = document.getElementById('location-title');
+        const storyText = document.getElementById('story-text');
+        const gameImage = document.getElementById('game-image');
+        const imageContainer = document.getElementById('image-container');
+        const imageLoader = document.getElementById('image-loader');
+        const actionsContainer = document.getElementById('actions-container');
+        const inventoryList = document.getElementById('inventory-list');
+        const npcPanel = document.getElementById('npc-panel');
+        const npcButtons = document.getElementById('npc-buttons');
+        const chatWindow = document.getElementById('chat-window');
+        const chatWithName = document.getElementById('chat-with-name');
+        const closeChatBtn = document.getElementById('close-chat-btn');
+        const chatHistory = document.getElementById('chat-history');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const npcThinking = document.getElementById('npc-thinking');
+
+
+        // --- API Fonksiyonları ---
+
+        async function generateImage(prompt) {
+            gameImage.classList.add('hidden');
+            imageLoader.classList.remove('hidden');
+            try {
+                const payload = { instances: [{ prompt: prompt }], parameters: { "sampleCount": 1 } };
+                const response = await fetch(IMAGEN_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    throw new Error(`Imagen API error: ${response.statusText}`);
+                }
+                const result = await response.json();
+                if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                    gameImage.src = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                } else {
+                    throw new Error("Geçersiz görsel verisi alındı.");
+                }
+            } catch (error) {
+                console.error("Görsel üretilemedi:", error);
+                gameImage.src = `https://placehold.co/600x400/1f2937/a3a3a3?text=Görsel+Yüklenemedi`;
+            } finally {
+                imageLoader.classList.add('hidden');
+                gameImage.classList.remove('hidden');
+            }
+        }
+
+        async function getNpcResponse(npcKey, userMessage) {
+            const npc = npcs[npcKey];
+            const history = gameState.chatHistories[npcKey] || [];
+            
+            // Gemini API için sohbet geçmişini oluştur
+            let apiHistory = [{
+                role: "model",
+                parts: [{ text: npc.prompt }]
+            }];
+
+            history.forEach(entry => {
+                apiHistory.push({
+                    role: entry.sender === 'user' ? 'user' : 'model',
+                    parts: [{ text: entry.text }]
+                });
+            });
+            apiHistory.push({ role: "user", parts: [{ text: userMessage }] });
+
+            const payload = { contents: apiHistory };
+            
+            try {
+                const response = await fetch(GEMINI_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    throw new Error(`Gemini API error: ${response.statusText}`);
+                }
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0) {
+                     // Sansürlenme durumunu kontrol et
+                    const candidate = result.candidates[0];
+                    if (candidate.finishReason === "SAFETY") {
+                        return "Bu konuda konuşmak istemiyorum.";
+                    }
+                    if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+                        return candidate.content.parts[0].text;
+                    }
+                }
+                return "Ne diyeceğimi bilemiyorum...";
+
+            } catch (error) {
+                console.error("NPC yanıtı alınamadı:", error);
+                return "Kusura bakma, şu an aklım biraz dağınık...";
+            }
+        }
+
+        // --- UI Güncelleme Fonksiyonları ---
+
+        function updateInventory() {
+            inventoryList.innerHTML = '';
+            if (gameState.inventory.length === 0) {
+                inventoryList.innerHTML = '<li class="text-gray-400">Envanterin boş.</li>';
+            } else {
+                gameState.inventory.forEach(item => {
+                    const li = document.createElement('li');
+                    li.textContent = item;
+                    inventoryList.appendChild(li);
+                });
+            }
+        }
+        
+        function renderLocation(locationKey) {
+            const location = locations[locationKey];
+            if (!location) return;
+
+            gameState.currentLocation = locationKey;
+            
+            locationTitle.textContent = location.title;
+            storyText.textContent = location.description;
+            
+            generateImage(location.imagePrompt);
+
+            // Eylem düğmelerini oluştur
+            actionsContainer.innerHTML = '';
+            location.actions.forEach(action => {
+                const button = document.createElement('button');
+                button.textContent = action.text;
+                button.className = 'bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-lg mr-2 mb-2 transition-colors';
+                button.onclick = () => {
+                    if (action.target === 'liman' && gameState.inventory.length < 2) {
+                        gameState.inventory.push('Eski Mektup');
+                        gameState.inventory.push('Paslı Anahtar');
+                        updateInventory();
+                    }
+                    renderLocation(action.target);
+                };
+                actionsContainer.appendChild(button);
+            });
+            
+            // NPC'leri göster
+            npcButtons.innerHTML = '';
+            if (location.npcs.length > 0) {
+                npcPanel.classList.remove('hidden');
+                location.npcs.forEach(npcKey => {
+                    const npc = npcs[npcKey];
+                    const button = document.createElement('button');
+                    button.textContent = `Konuş: ${npc.name}`;
+                    button.className = 'w-full text-left bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors';
+                    button.onclick = () => openChat(npcKey);
+                    npcButtons.appendChild(button);
+                });
+            } else {
+                npcPanel.classList.add('hidden');
+            }
+            
+            // Eğer bir sohbet açıksa kapat
+            chatWindow.classList.add('hidden');
+        }
+
+        function addMessageToChat(sender, text) {
+            const bubble = document.createElement('div');
+            bubble.classList.add('chat-bubble');
+            bubble.textContent = text;
+            
+            if (sender === 'user') {
+                bubble.classList.add('chat-bubble-user');
+            } else {
+                bubble.classList.add('chat-bubble-npc');
+            }
+            chatHistory.appendChild(bubble);
+            chatHistory.scrollTop = chatHistory.scrollHeight; // Otomatik aşağı kaydır
+        }
+        
+        // --- Sohbet Yönetimi ---
+
+        function openChat(npcKey) {
+            gameState.currentChatNpc = npcKey;
+            const npc = npcs[npcKey];
+
+            chatWithName.textContent = `${npc.name} ile Sohbet`;
+            chatWindow.classList.remove('hidden');
+            npcPanel.classList.add('hidden'); // Sohbet açılınca NPC listesini gizle
+
+            // Sohbet geçmişini yükle
+            chatHistory.innerHTML = '';
+            const history = gameState.chatHistories[npcKey] || [];
+            if (history.length === 0) {
+                // İlk mesaj
+                const firstMessage = "Merhaba, nasıl yardımcı olabilirim?";
+                history.push({sender: 'npc', text: firstMessage});
+                gameState.chatHistories[npcKey] = history;
+            }
+            
+            history.forEach(msg => addMessageToChat(msg.sender, msg.text));
+        }
+
+        function closeChat() {
+            chatWindow.classList.add('hidden');
+            npcPanel.classList.remove('hidden'); // Sohbeti kapatınca NPC listesini tekrar göster
+            gameState.currentChatNpc = null;
+        }
+
+        async function handleChatSubmit(e) {
+            e.preventDefault();
+            const userMessage = chatInput.value.trim();
+            if (!userMessage || !gameState.currentChatNpc) return;
+            
+            addMessageToChat('user', userMessage);
+            gameState.chatHistories[gameState.currentChatNpc].push({ sender: 'user', text: userMessage });
+            chatInput.value = '';
+            npcThinking.classList.remove('hidden');
+
+            const npcResponse = await getNpcResponse(gameState.currentChatNpc, userMessage);
+            
+            npcThinking.classList.add('hidden');
+            addMessageToChat('npc', npcResponse);
+            gameState.chatHistories[gameState.currentChatNpc].push({ sender: 'npc', text: npcResponse });
+        }
+
+
+        // --- Oyun Başlangıcı ---
+
+        function init() {
+            renderLocation('ev');
+            updateInventory();
+            
+            closeChatBtn.addEventListener('click', closeChat);
+            chatForm.addEventListener('submit', handleChatSubmit);
+        }
+
+        init();
+
+    </script>
+</body>
+</html>
