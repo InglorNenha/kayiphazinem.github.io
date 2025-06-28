@@ -134,19 +134,19 @@
             }
         };
 
-        // GÖRSEL DEĞİŞİKLİĞİ: Her mekan için farklı ve güvenilir bir kaynaktan (Pexels) görsel URL'leri ekledik.
+        // GÖRSEL DEĞİŞİKLİĞİ: Görsel URL'leri artık klasör olmadan, doğrudan dosya adlarına işaret ediyor.
         const locations = {
             'ev': {
                 title: "Büyük Amcanın Çalışma Odası",
                 description: "Büyük amcandan gelen gizemli paketi az önce açtın. Masanın üzerinde, solgun ışığın aydınlattığı sararmış bir mektup ve yanında paslı, oymalı bir anahtar duruyor. Mektubu okudun, amcan senden 'Alaz Limanı'na gitmeni ve aile yadigarı bir sırrın peşine düşmeni istiyor. Ayrıca 'dikkatli ol, peşimdeler' diye de bir not düşmüş. Ne yapacaksın?",
-                imageUrl: "https://images.pexels.com/photos/276528/pexels-photo-276528.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+                imageUrl: "ev.jpg",
                 actions: [{ text: "Mektubu ve anahtarı alıp Alaz Limanı'na git", target: 'liman' }],
                 npcs: []
             },
             'liman': {
                 title: "Alaz Limanı",
                 description: "Saatler süren bir yolculuktan sonra Alaz Limanı'na vardın. Martı sesleri ve iyot kokusu seni karşılıyor. Tarihi taş binalar, dar sokaklar ve hareketli bir liman... Amcanın mektubunda bahsettiği yer burası olmalı. Etrafta bir müze ve bir antika dükkanı tabelası gözüne çarpıyor. Nereye gitmek istersin?",
-                imageUrl: "https://images.pexels.com/photos/1654883/pexels-photo-1654883.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+                imageUrl: "liman.jpg",
                 actions: [
                     { text: "Müzeye git", target: 'muze' },
                     { text: "Antika dükkanına git", target: 'antikaci' }
@@ -156,14 +156,14 @@
             'muze': {
                 title: "Alaz Limanı Müzesi",
                 description: "Müzenin sessiz ve serin koridorlarındasın. Vitrinlerde kasabanın tarihi eserleri sergileniyor. Danışmada genç bir kadın çalışıyor. Belki de amcan hakkında bir şeyler biliyordur.",
-                imageUrl: "https://images.pexels.com/photos/7520703/pexels-photo-7520703.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+                imageUrl: "muze.jpg",
                 actions: [{ text: "Limana geri dön", target: 'liman' }],
                 npcs: ['elif']
             },
             'antikaci': {
                 title: "Kenan'ın Antika Dükkanı",
                 description: "Kapıdaki küçük zilin sesiyle loş ve tıklım tıklım dolu bir dükkana girdin. Havada eski kağıt ve ahşap kokusu var. Tezgahın arkasında yaşlı bir adam seni süzüyor. Burası Antikacı Kenan'ın yeri olmalı.",
-                imageUrl: "https://images.pexels.com/photos/2646337/pexels-photo-2646337.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+                imageUrl: "antikaci.jpg",
                 actions: [{ text: "Limana geri dön", target: 'liman' }],
                 npcs: ['kenan']
             }
